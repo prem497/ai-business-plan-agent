@@ -13,14 +13,19 @@ import pandas as pd
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from agents import run_agent_pipeline, AGENT_STEPS
 
 load_dotenv()
 
-# Read backend URL from Streamlit secrets (cloud) or environment variable (local)
+# Load API key from Streamlit secrets (cloud) or .env (local)
 try:
-    BACKEND_URL = st.secrets.get("BACKEND_URL", os.getenv("BACKEND_URL", "http://localhost:8000"))
+    GROK_API_KEY = st.secrets.get("GROK_API_KEY", os.getenv("GROK_API_KEY", ""))
 except Exception:
-    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+    GROK_API_KEY = os.getenv("GROK_API_KEY", "")
+if GROK_API_KEY:
+    os.environ["GROK_API_KEY"] = GROK_API_KEY
 
 # ─────────────────────────────────────────────
 # Page Configuration
@@ -764,10 +769,10 @@ def make_funding_pie(allocation: dict) -> go.Figure:
 
 
 # ─────────────────────────────────────────────
-# GENERATE PLAN FUNCTION
+# GENERATE PLAN FUNCTION (Direct — no HTTP)
 # ─────────────────────────────────────────────
 def generate_plan(idea: str, step_placeholder, status_placeholder):
-    """Call backend API and update steps in real time."""
+    """Run agent pipeline directly — no backend HTTP call needed."""
     AGENT_STEPS_LIST = [
         "Analyzing Idea", "Market Research", "Competitor Analysis",
         "Business Model", "Financial Projections", "Marketing Strategy",
@@ -793,30 +798,23 @@ def generate_plan(idea: str, step_placeholder, status_placeholder):
 
     render_steps(steps)
     try:
-        resp = requests.post(
-            f"{BACKEND_URL}/api/generate-plan-sync",
-            json={"idea": idea}, timeout=300,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            for step_info in data.get("steps", []):
-                sname = step_info["step"]
-                if sname in steps:
-                    steps[sname] = "completed"
-                    render_steps(steps)
-                    time.sleep(0.08)
-            for s in steps:
-                steps[s] = "completed"
-            render_steps(steps)
-            return data.get("plan")
-        else:
-            status_placeholder.error(f"Backend error: {resp.text}")
-            return None
-    except requests.exceptions.ConnectionError:
-        status_placeholder.error("⚠️ Cannot connect to backend. Make sure FastAPI is running on port 8000.")
-        return None
+        result_container = {}
+
+        def progress_cb(step_name, status, data=None):
+            if step_name in steps:
+                steps[step_name] = status
+                render_steps(steps)
+
+        plan = run_agent_pipeline(idea, progress_callback=progress_cb)
+
+        # Mark all complete
+        for s in steps:
+            steps[s] = "completed"
+        render_steps(steps)
+        return plan
+
     except Exception as e:
-        status_placeholder.error(f"Error: {str(e)}")
+        status_placeholder.error(f"❌ Error generating plan: {str(e)}")
         return None
 
 
