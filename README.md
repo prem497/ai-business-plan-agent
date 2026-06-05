@@ -130,6 +130,10 @@ ServiceURLFrontend (Streamlit)http://localhost:8501Backend API (FastAPI)http://l
 VariableDescriptionDefaultGROK_API_KEYYour xAI Grok API key(required)GROK_BASE_URLGrok API base URLhttps://api.x.ai/v1GROK_MODELModel to usegrok-3-miniBACKEND_URLFastAPI backend URLhttp://localhost:8000
 
 
+Demo:https://drive.google.com/file/d/1uiPNTwlW93vmUbPpLHK1LqtdEB_G_6M0/view?usp=sharing
+Author:Premchandar
+
+
 Demo:
 
 Author:Premchandar
